@@ -2,6 +2,8 @@ import matplotlib.image as mpimg
 import numpy as np
 import cv2
 from skimage.feature import hog
+from scipy.ndimage.measurements import label
+
 # Define a function to return HOG features and visualization
 def get_hog_features(img, orient, pix_per_cell, cell_per_block, 
                         vis=False, feature_vec=True):
@@ -110,7 +112,6 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler, orient, pix_per_cell, ce
     ctrans_tosearch = img_tosearch #convert_color(img_tosearch, conv='RGB2YCrCb')
     if scale != 1:
         imshape = ctrans_tosearch.shape
-        print(imshape)
         ctrans_tosearch = cv2.resize(ctrans_tosearch, (np.int(imshape[1]/scale), np.int(imshape[0]/scale)))
         
     ch1 = ctrans_tosearch[:,:,0]
@@ -163,8 +164,10 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler, orient, pix_per_cell, ce
                 xbox_left = np.int(xleft*scale)
                 ytop_draw = np.int(ytop*scale)
                 win_draw = np.int(window*scale)
-                bboxes.append([(xbox_left, ytop_draw+ystart),(xbox_left+win_draw,ytop_draw+win_draw+ystart)])
-                cv2.rectangle(draw_img,(xbox_left, ytop_draw+ystart),(xbox_left+win_draw,ytop_draw+win_draw+ystart),(0,0,255),6) 
+                pt_right = (xbox_left+win_draw)
+                if pt_right > 600:
+                    bboxes.append([(xbox_left, ytop_draw+ystart),(xbox_left+win_draw,ytop_draw+win_draw+ystart)])
+                    cv2.rectangle(draw_img,(xbox_left, ytop_draw+ystart),(xbox_left+win_draw,ytop_draw+win_draw+ystart),(0,0,255),6) 
                 
     return draw_img, bboxes
 
@@ -176,7 +179,7 @@ def add_heat(heatmap, bbox_list):
         heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
 
     # Return updated heatmap
-    return heatmap# Iterate through list of bboxes
+    return heatmap
     
 def apply_threshold(heatmap, threshold):
     # Zero out pixels below the threshold
@@ -198,3 +201,26 @@ def draw_labeled_bboxes(img, labels):
         cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
     # Return the image
     return img
+
+def heat(img, box_list):
+    heat = np.zeros_like(img[:,:,0]).astype(np.float)
+
+    # Add heat to each box in box list
+    heat = add_heat(heat,box_list)
+        
+    # Apply threshold to help remove false positives
+    heat = apply_threshold(heat,1)
+    # Visualize the heatmap when displaying    
+    heatmap = np.clip(heat, 0, 255)
+    # Find final boxes from heatmap using label function
+    labels = label(heatmap)
+    draw_img = draw_labeled_bboxes(np.copy(img), labels)
+    return draw_img
+    #fig = plt.figure()
+    #plt.subplot(121)
+    #plt.imshow(draw_img)
+    #plt.title('Car Positions')
+    #plt.subplot(122)
+    #plt.imshow(heatmap, cmap='hot')
+    #plt.title('Heat Map')
+    #fig.tight_layout()

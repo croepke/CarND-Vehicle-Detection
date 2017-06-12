@@ -1,3 +1,6 @@
 images/
 .DS_Store
 .ipynb_checkpoints/
+__pycache__/
+classifier.pickle
+play_img/
